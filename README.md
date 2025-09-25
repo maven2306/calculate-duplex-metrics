@@ -54,8 +54,12 @@ Rscript src/main.R
 
 ### CLI flags
 
--i, --input rinfo file (.txt or .txt.gz) \| -o, --output output CSV path (long format) \| -s, --sample sample ID (defaults to input basename) \| --rfunc_dir folder OR file for efficiency_nanoseq_functions.R \| --rlen read length (default: 151) \| --skips trimmed/ignored bases per read (Nano=5, xGEN=8) \| -v, --verbose verbose logging
+-i, --input : rinfo file (.txt or .txt.gz) | -o, --output : output CSV path (long format) | -s, --sample : sample ID (defaults to input basename) | --rfunc_dir : folder OR file for efficiency_nanoseq_functions.R | --rlen : read length (default: 151) | --skips : trimmed/ignored bases per read (Nano=5, xGEN=8) | -v, --verbose : verbose logging
 
+#### Sanity check the CLI
+```bash
+Rscript src/main.R --help
+```
 ## Outputs
 
 ```         
