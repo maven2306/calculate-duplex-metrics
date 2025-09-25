@@ -1,32 +1,37 @@
-FROM rocker/r-ver:4.3.0
+# syntax=docker/dockerfile:1
+ARG R_VER=4.4.1
+FROM rocker/r-ver:${R_VER}
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    libcurl4-openssl-dev \
-    libssl-dev \
-    libxml2-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Install system dependencies  + Python (argparse/json are stdlib modules)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libcurl4-openssl-dev libssl-dev libxml2-dev \
+    python3 python3-pip python3-venv python3-distutils \
+ && rm -rf /var/lib/apt/lists/*
+
+# Hint to findpython (optional but helpful)
+ENV PYTHON=/usr/bin/python3
+ENV PYTHON3=/usr/bin/python3
 
 # Set working directory
 WORKDIR /app
 
-# Copy package files
-COPY DESCRIPTION .
-COPY renv.lock .
-COPY .Rprofile .
+# Keep renv's library outside the project so mounts don't hide it
+ENV RENV_PATHS_LIBRARY=/opt/renv/library
+RUN mkdir -p /opt/renv/library
 
-# Install renv and restore packages
-RUN R -e "install.packages('renv')" && \
-    R -e "renv::restore()"
+# Copy renv infra FIRST
+COPY renv.lock ./
+COPY renv/ ./renv/
+COPY .Rprofile ./
 
-# Copy application code
+# Restore R packages; fail build if argparse didn't install
+RUN R -q -e "options(repos=c(CRAN='https://cloud.r-project.org')); install.packages('renv')" \
+ && R -q -e "renv::restore(prompt = FALSE)" \
+ && R -q -e "stopifnot(all(c('argparse','data.table','dplyr','magrittr','R.utils') %in% rownames(installed.packages())))"
+
+# Copy the rest
 COPY . .
 
-# Install the package
-RUN R -e "devtools::install('.', dependencies = FALSE)"
-
-# Make CLI executable
-RUN chmod +x inst/cli/main.R
-
 # Set entrypoint
-ENTRYPOINT ["Rscript", "inst/cli/main.R"]
+ENTRYPOINT ["Rscript", "src/main.R"]
