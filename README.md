@@ -1,6 +1,6 @@
 # Calculate Duplex Metrics
 
-An R CLI tool to take in summarised read information and output QC duplex metrics.
+An R CLI tool to take in summarised read information and output a variety of duplex metrics.
 
 **QC metrics:** `efficiency`, `drop_out_rate`.
 
@@ -10,7 +10,7 @@ An R CLI tool to take in summarised read information and output QC duplex metric
 
 -   R version 4.4.1
 
--   Packages: `argparse`, `magrittr`, `data.table`, `R.utils`\
+-   Packages: `argparse`, `magrittr`, `data.table`, `R.utils`
 
 ## Requirement
 
