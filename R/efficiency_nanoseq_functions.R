@@ -1,3 +1,5 @@
+# Code obtained from https://github.com/WEHIGenomicsRnD/G000204_duplex/blob/main/code/efficiency_nanoseq_functions.R
+
 # Efficiency metric calculations
 calculate_singletons <- function(rbs) {
     total_reads <- sum(rbs$x, rbs$y)

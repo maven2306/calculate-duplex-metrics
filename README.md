@@ -35,10 +35,10 @@ install.packages(c("argparse","magrittr","data.table","R.utils"),
 
 ``` bash
 Rscript main.R \
-  --input  "/Users/dylandinh/Desktop/QC/read_info/NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001.txt.gz" \
-  --output "/Users/dylandinh/calculate-duplex-metrics/output/NanoMB1Rep1_duplex_metrics.csv" \
-  --sample "NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001" \
-  --rfunc_dir "/Users/dylandinh/calculate-duplex-metrics/src/efficiency_nanoseq_functions.R" \
+  --input  "data/test.rinfo" \
+  --output "test_duplex_metrics.csv" \
+  --sample "test" \
+  --rfunc_dir "R/efficiency_nanoseq_functions.R" \
   --rlen 151 --skips 5
 ```
 
