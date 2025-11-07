@@ -11,5 +11,9 @@ Depends:
     R (>= 4.0.0)
 Imports:
     argparse
+    data.table,
+    dplyr,
+    magrittr,
+    R.utils
 Suggests:
     testthat (>= 3.0.0)
