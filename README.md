@@ -12,10 +12,6 @@ An R CLI tool to take in summarised read information and output a variety of dup
 
 -   Packages: `argparse`, `magrittr`, `data.table`, `R.utils`
 
-## Requirement
-
--   Access to `G000204_duplex` repo (for `code/efficiency_nanoseq_functions.R`) then move `efficiency_nanoseq_functions.R` to `src` within calculate-duplex-metrics repo.
-
 ## Using renv (recommended)
 
 ```         
@@ -42,19 +38,18 @@ Rscript main.R \
   --rlen 151 --skips 5
 ```
 
-#### Minimal version:
-
-``` bash
-Rscript main.R
-  --input  /abs/path/QC/read_info/<sample>.txt.gz \
-  --output output/<sample>_duplex_metrics.csv \
-  --rfunc_dir /abs/path/calculate-duplex-metrics/src/efficiency_nanoseq_functions.R \
-  --rlen 151 --skips 5
-```
-
 ### CLI flags
 
--i, --input : rinfo file (.txt or .txt.gz) | -o, --output : output CSV path (long format) | -s, --sample : sample ID (defaults to input basename) | --rfunc_dir : folder OR file for efficiency_nanoseq_functions.R | --rlen : read length (default: 151) | --skips : trimmed/ignored bases per read (Nano=5, xGEN=8) | -v, --verbose : verbose logging
+```
+Options:
+  -i, --input     : rinfo file (.txt or .txt.gz)
+  -o, --output    : output CSV path (long format)
+  -s, --sample    : sample ID (defaults to input basename)
+  --rfunc_dir     : folder OR file for efficiency_nanoseq_functions.R
+  --rlen          : read length (default: 151)
+  --skips         : trimmed/ignored bases per read (Nano=5, xGEN=8)
+  -v, --verbose   : verbose logging
+```
 
 #### Sanity check the CLI
 ```bash
