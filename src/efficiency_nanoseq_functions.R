@@ -157,3 +157,4 @@ calculate_gc <- function(rbs, sample_n = 10000, max_gap = 100000) {
 
     return(c(gc_single=gc_single, gc_both=gc_both, gc_deviation=abs(gc_single - gc_both)))
 }
+

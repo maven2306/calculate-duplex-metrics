@@ -4,7 +4,7 @@
 # Generate duplex Efficiency & Drop-out Rate from a single rinfo file
 #
 # Usage:
-#   Rscript src/main.R \
+#   Rscript main.R \
 #     <input_rinfo.txt(.gz)> <output.csv> [sample_id] [rfunc_dir_or_file] [rlen] [skips]
 #
 # Notes:
