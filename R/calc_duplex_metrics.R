@@ -1,15 +1,35 @@
 #!/usr/bin/env Rscript
 # ------------------------------------------------------------------
 # calc_duplex_metrics.R
-# Generate duplex Efficiency & Drop-out Rate from a single rinfo file
+#
+# Compute duplex-sequencing metrics from a single rinfo file and write
+# them in long-format (sample, metric, value) CSV.
 #
 # Usage:
-#   Rscript main.R \
-#     <input_rinfo.txt(.gz)> <output.csv> [sample_id] [rfunc_dir_or_file] [rlen] [skips]
+#   Rscript calc_duplex_metrics.R \
+#     <input_rinfo.txt(.gz)> <output.csv> \
+#     [sample_id] [rfunc_dir_or_file] [rlen] [skips]
+#
+# Description:
+#   This script loads metric functions from efficiency_nanoseq_functions.R
+#   and applies them to a single input rinfo file. All available metrics
+#   returned by calculate_metrics_single() are exported, including:
+#
+#     - frac_singletons
+#     - efficiency
+#     - drop_out_rate
+#     - GC metrics (gc_single, gc_both, gc_deviation)*
+#     - family statistics (total_families, family_mean, family_median,
+#       family_max, families_gt1, single_families, paired_families,
+#       paired_and_gt1)
+#
+#   (*) GC metrics are returned as NA at the MVP stage unless a reference
+#       genome and required Bioconductor dependencies are provided.
 #
 # Notes:
-#   - Expects upstream helpers at efficiency_nanoseq_functions.R
-#   - Only the two MVP metrics are written (long format CSV)
+#   - This script supports both wide (column-based) and long (metric/value)
+#     schemas returned by upstream functions.
+#   - Output is always written as long format CSV suitable for MultiQC.
 # ------------------------------------------------------------------
 
 suppressPackageStartupMessages({
@@ -53,7 +73,9 @@ sys.source(func_file, envir = fn_env)
 
 # MVP: GC not needed; neutralise to avoid genome_* / Bioconductor deps 
 if (exists("calculate_gc", envir = fn_env, inherits = FALSE)) {
-  fn_env$calculate_gc <- function(rbs, ...) NA_real_
+  fn_env$calculate_gc <- function(rbs, ...) {
+    c(gc_single = NA_real_, gc_both = NA_real_, gc_deviation = NA_real_)
+  }
 }
 
 # 4. Compute metrics for exactly this file (match on basename w/o .txt/.gz)
@@ -66,20 +88,64 @@ tbl <- if (is.list(res) && !is.data.frame(res)) res[[1]] else res
 if (is.null(tbl) || nrow(tbl) == 0) stop("Empty metrics table.")
 
 # 5. Extract Efficiency & Drop_out_rate (supports wide or long schemas)
-if (all(c("efficiency","drop_out_rate") %in% names(tbl))) {
-  eff <- as.numeric(tbl$efficiency[1]); dr <- as.numeric(tbl$drop_out_rate[1])
-} else if (all(c("metric","value") %in% names(tbl))) {
+#if (all(c("efficiency","drop_out_rate") %in% names(tbl))) {
+#eff <- as.numeric(tbl$efficiency[1]); dr <- as.numeric(tbl$drop_out_rate[1])
+#} else if (all(c("metric","value") %in% names(tbl))) {
+#  mm <- tolower(gsub("[- ]","_", tbl$metric))
+#  eff <- as.numeric(tbl$value[match("efficiency", mm)])
+#  dr  <- as.numeric(tbl$value[match("drop_out_rate", mm, nomatch = match("dropout_rate", mm))])
+#} else {
+#  stop("Unrecognised metrics table schema: ", paste(names(tbl), collapse = ", "))
+#}
+
+
+# Include more metrics from efficiency_nanoseq_functons.R
+metrics <- c(
+  "frac_singletons",
+  "efficiency",
+  "drop_out_rate",
+  "gc_single",
+  "gc_both",
+  "gc_deviation",
+  "total_families",
+  "family_mean",
+  "family_median",
+  "family_max",
+  "families_gt1",
+  "single_families",
+  "paired_families",
+  "paired_and_gt1"
+            )
+
+# Extract metrics (supports wide or long schemas)
+if (any(metrics %in% names(tbl))) {
+  metric_values <- setNames(
+    as.numeric(tbl[1, metrics[metrics %in% names(tbl)], drop = TRUE]),
+    metrics[metrics %in% names(tbl)]
+  )
+} else if (all(c("metric", "value") %in% names(tbl))) {
   mm <- tolower(gsub("[- ]","_", tbl$metric))
-  eff <- as.numeric(tbl$value[match("efficiency", mm)])
-  dr  <- as.numeric(tbl$value[match("drop_out_rate", mm, nomatch = match("dropout_rate", mm))])
+  metric_values <- vapply(
+    metrics,
+    function(m) {
+      idx <- match(m, mm)
+      if (is.na(idx)) NA_real_ else as.numeric(tbl$value[idx])
+    },
+    numeric(1)
+  )
+  names(metric_values) <- metrics
+  
 } else {
   stop("Unrecognised metrics table schema: ", paste(names(tbl), collapse = ", "))
 }
 
-# 6. Write long-format CSV (sample, metric, value)
+
+# Write long-format CSV (sample, metric, value)
 out <- data.frame(sample = sample,
-                  metric = c("efficiency","drop_out_rate"),
-                  value  = c(eff, dr),
+                  #metric = c("efficiency","drop_out_rate"),
+                  metric = names(metric_values),
+                  #value  = c(eff, dr),
+                  value = as.numeric(metric_values),
                   check.names = FALSE)
 dir.create(dirname(out_csv), showWarnings = FALSE, recursive = TRUE)
 write.csv(out, out_csv, row.names = FALSE, quote = FALSE)
