@@ -1,0 +1,15 @@
+sample,metric,value
+test,frac_singletons,0.0888888888888889
+test,efficiency,0.0644591611479029
+test,drop_out_rate,-0.033203125
+test,gc_single,NA
+test,gc_both,NA
+test,gc_deviation,NA
+test,total_families,9
+test,family_mean,5
+test,family_median,3
+test,family_max,13
+test,families_gt1,5
+test,single_families,4
+test,paired_families,4
+test,paired_and_gt1,3

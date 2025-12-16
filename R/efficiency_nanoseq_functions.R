@@ -40,7 +40,7 @@ calculate_metrics_single <- function(rbs) {
     metrics$efficiency <- calculate_efficiency(rbs)
     metrics$drop_out_rate <- calculate_missed_fraction(rbs)
 
-    gc_stats <- calculate_gc(rbs)
+    gc_stats <- calculate_gc(rbs, genomeFile = genomeFile, genome_max = genome_max)
     family_stats <- calculate_family_stats(rbs)
     metrics <- data.frame(metrics, t(gc_stats))
     metrics <- data.frame(metrics, t(family_stats))
@@ -59,7 +59,7 @@ calc_metrics_new_rbs <- function(rinfo_dir, pattern="\\.txt.gz", cores=8) {
         mclapply(., fread, mc.cores=cores) %>%
         mclapply(., calculate_metrics_single, mc.cores=cores)
 
-    return(metrics)
+    return(metrics) 
 }
 
 # functions below are adapted from
@@ -102,61 +102,87 @@ calculate_missed_fraction <- function(rbs) {
 # from cancerit/NanoSeq documentation:
 # The GC content of RBs with both strands and with just one strand.
 # I return the difference between the two values.
-calculate_gc <- function(rbs, sample_n = 10000, max_gap = 100000) {
-    rbs <- data.frame(rbs)
-    colnames(rbs)[5:6] = c('plus', 'minus')
 
-    # remove any chroms not in the sizes vector
-    # rbs <- rbs[rbs$chrom %in% names(genome_max),]
+calculate_gc <- function(rbs, sample_n = 10000, max_gap = 100000, genomeFile, genome_max) {
+  rbs <- data.frame(rbs)
+  colnames(rbs)[5:6] <- c("plus", "minus")
+  
+  # remove any chroms not in the sizes vector
+  rbs <- rbs[rbs$chrom %in% names(genome_max), ]
 
-    # remove records with mate positions exceeding genome max
-    rbs$end <- rbs$mpos + rlen - skips
-    if(length(genome_max) > 1) {
-        for(i in 1:length(genome_max)) {
-            chrom <- names(genome_max[i])
-            chrom_max <- genome_max[i]
-            rbs <- rbs[!(rbs$chrom == chrom & rbs$end > chrom_max),]
-        }
-    } else {
-        rbs <- rbs[!rbs$end > genome_max,]
+  # compute end and drop invalid ranges early
+  rbs$end <- rbs$mpos + rlen - skips
+
+  rbs <- rbs[!is.na(rbs$pos) & !is.na(rbs$end) & rbs$pos > 0 & rbs$end >= rbs$pos, ]
+
+  # remove records with mate positions exceeding genome max
+  if (length(genome_max) > 1) {
+    for (i in seq_along(genome_max)) {
+      chrom <- names(genome_max)[i]
+      chrom_max <- genome_max[[i]]
+      rbs <- rbs[!(rbs$chrom == chrom & rbs$end > chrom_max), ]
     }
+  } else {
+    rbs <- rbs[rbs$end <= genome_max, ]
+  }
 
-    # remove records with large distances between mates
-    rbs <- rbs[rbs$end - rbs$pos < max_gap,]
+  # remove records with large distances between mates
+  rbs <- rbs[(rbs$end - rbs$pos) < max_gap, ]
 
-    # remove zero-records
-    rbs <- rbs[rbs$pos != 0,]
+  # remove zero-records (redundant but safe)
+  rbs <- rbs[rbs$pos != 0, ]
 
-    rbs_both <- rbs[which(rbs$minus + rbs$plus >= 4 & rbs$minus >= 2 & rbs$plus >= 2),]
-    rbs_both <- rbs_both[sample(1:nrow(rbs_both), min(sample_n, nrow(rbs_both))),]
+  # split RBs
+  rbs_both <- rbs[which(rbs$minus + rbs$plus >= 4 &
+                        rbs$minus >= 2 &
+                        rbs$plus  >= 2), ]
+  rbs_single <- rbs[which(rbs$minus + rbs$plus > 4 &
+                          (rbs$minus == 0 | rbs$plus == 0)), ]
 
-    rbs_single <- rbs[which(rbs$minus + rbs$plus > 4 & (rbs$minus == 0 | rbs$plus == 0)),]
-    rbs_single <- rbs_single[sample(1:nrow(rbs_single), min(sample_n, nrow(rbs_single))),]
 
-    seqs_both <- GRanges(rbs_both$chrom,
-                         IRanges(start=rbs_both$pos,
-                                 end=rbs_both$end)) %>%
-        scanFa(genomeFile, .) %>%
-        as.vector()
+  # guard: not enough RBs
+  if (nrow(rbs_both) == 0 || nrow(rbs_single) == 0) {
+    return(c(gc_single = NA_real_, gc_both = NA_real_, gc_deviation = NA_real_))
+  }
 
-    seqs_single <- GRanges(rbs_single$chrom,
-                           IRanges(start=rbs_single$pos,
-                                   end=rbs_single$end)) %>%
-        scanFa(genomeFile, .) %>%
-        as.vector()
+  # sample
+  rbs_both <- rbs_both[sample(seq_len(nrow(rbs_both)),
+                               min(sample_n, nrow(rbs_both))), ]
+  rbs_single <- rbs_single[sample(seq_len(nrow(rbs_single)),
+                                   min(sample_n, nrow(rbs_single))), ]
 
-    seqs_both_collapsed <- paste(seqs_both, collapse = '')
-    seqs_single_collapsed <- paste(seqs_single, collapse = '')
+  # extract sequences
+  seqs_both <- GRanges(rbs_both$chrom,
+                       IRanges(start = rbs_both$pos,
+                               end   = rbs_both$end)) %>%
+    scanFa(genomeFile, .) %>% as.vector()
 
-    tri_both <- DNAString(seqs_both_collapsed) %>% trinucleotideFrequency(.)
-    tri_single <- DNAString(seqs_single_collapsed) %>% trinucleotideFrequency(.)
+  seqs_single <- GRanges(rbs_single$chrom,
+                         IRanges(start = rbs_single$pos,
+                                 end   = rbs_single$end)) %>%
+    scanFa(genomeFile, .) %>% as.vector()
 
-    tri_both_freqs <- tri_both  / sum(tri_both)
-    tri_single_freqs <- tri_single / sum(tri_single)
+  # drop NA sequences
+  seqs_both   <- seqs_both[!is.na(seqs_both)]
+  seqs_single <- seqs_single[!is.na(seqs_single)]
 
-    gc_both <- s2c(seqs_both_collapsed) %>% GC()
-    gc_single <- s2c(seqs_single_collapsed) %>% GC()
+  if (length(seqs_both) == 0 || length(seqs_single) == 0) {
+    return(c(gc_single = NA_real_, gc_both = NA_real_, gc_deviation = NA_real_))
+  }
 
-    return(c(gc_single=gc_single, gc_both=gc_both, gc_deviation=abs(gc_single - gc_both)))
+  seqs_both_collapsed   <- paste(seqs_both, collapse = "")
+  seqs_single_collapsed <- paste(seqs_single, collapse = "")
+
+  if (is.na(seqs_both_collapsed) || is.na(seqs_single_collapsed) ||
+      nchar(seqs_both_collapsed) == 0 || nchar(seqs_single_collapsed) == 0) {
+    return(c(gc_single = NA_real_, gc_both = NA_real_, gc_deviation = NA_real_))
+  }
+
+  gc_both   <- s2c(seqs_both_collapsed)   %>% GC()
+  gc_single <- s2c(seqs_single_collapsed) %>% GC()
+
+  c(gc_single = gc_single,
+    gc_both = gc_both,
+    gc_deviation = abs(gc_single - gc_both))
 }
 
