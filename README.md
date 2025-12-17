@@ -2,10 +2,32 @@
 
 An R CLI tool to take in summarised read information and output a variety of duplex metrics.
 
-**QC metrics now supported:** `frac_singletons`, `efficiency`, `drop_out_rate`, GC metrics, and family statistics.
+### Available metrics
 
-> Internals: the CLI entrypoint is `main.R` (argument parsing + I/O). It delegates computation to `R/calc_duplex_metrics.R`, which sources from `R/efficiency_nanoseq_functions.R`.  
-> GC metrics are computed when a reference FASTA is provided; otherwise they are either set to `NA` (when GC is skipped) or the script errors if GC was requested but no reference was given.
+- frac_singletons
+- efficiency
+- drop_out_rate
+- gc_single
+- gc_both
+- gc_deviation
+- total_families
+- family_mean
+- family_median
+- family_max
+- families_gt1
+- single_families
+- paired_families
+- paired_and_gt1
+
+
+> Internals: the CLI entrypoint is `main.R`, which invokes `cli.R` for
+> argument parsing and validation. Computation is orchestrated in
+> `calculate.R` and delegated to `R/calc_duplex_metrics.R`, which sources
+> metric logic from `R/efficiency_nanoseq_functions.R`.
+>
+> GC metrics are computed when a reference FASTA is provided; otherwise
+> they are either set to `NA` (when GC is skipped) or the program errors
+> if GC was requested but no reference was given.
 
 ## Installation
 
@@ -36,53 +58,95 @@ BiocManager::install(c('Biostrings', 'GenomicRanges', 'IRanges', 'Rsamtools'))
 
 ## Usage
 
+
 #### Example (no GC computation):
-
-``` bash
-Rscript main.R \
-  --input  data/test.rinfo \
-  --output test_duplex_metrics.csv \
-  --sample test \
-  --rfunc_dir R/efficiency_nanoseq_functions.R \
-  --rlen 151 \
-  --skips 5 \
-  --skip_gc TRUE
-```
-
-#### Example (with GC enabled, requires refrence genome):
 
 ``` bash
 Rscript main.R \
   --input data/test.rinfo \
   --output test_duplex_metrics.csv \
   --sample test \
-  --rfunc_dir R/efficiency_nanoseq_functions.R \
-  --rlen 151 \
-  --skips 5 \
-  --ref_fasta ref/Ecoli.fa \
-  --skip_gc FALSE
+  --skip_gc TRUE
+
 ```
 
+#### Example (with GC enabled, requires reference genome):
+
+``` bash
+Rscript main.R \
+  --input data/test.rinfo \
+  --output test_duplex_metrics_gc.csv \
+  --sample test \
+  --ref_fasta ref/Escherichia_coli_ATCC_10798.fasta \
+  --skip_gc FALSE
+
+```
+
+#### Example (select specific metrics)
+
+``` bash
+Rscript main.R \
+  --input data/test.rinfo \
+  --output test_selected_metrics.csv \
+  --sample test \
+  --metrics efficiency,drop_out_rate \
+  --skip_gc TRUE
+```
+
+#### Example (multiple input files)
+
+``` bash
+Rscript main.R \
+  --input data/a.rinfo data/b.rinfo \
+  --output all_samples_metrics.csv \
+  --skip_gc TRUE \
+  --cores 2
+```
+
+#### Example (input directory + pattern)
+``` bash
+Rscript main.R \
+  --input_dir data \
+  --pattern "\\.rinfo(\\.gz)?$" \
+  --output all_samples_metrics.csv \
+  --skip_gc TRUE
+
+```
 
 ### CLI flags
 
-```
-Options:
-  -i, --input        rinfo file (.txt or .txt.gz)
-  -o, --output       output CSV path (long format)
-  -s, --sample       sample ID (defaults to input filename)
-  --rfunc_dir        directory or file for efficiency_nanoseq_functions.R
-  --rlen             read length (default: 151)
-  --skips            number of trimmed/ignored bases (Nano=5, xGEN=8)
-  --ref_fasta        optional reference genome FASTA (enables GC metrics)
-  --skip_gc          TRUE/FALSE; force-disable GC even if FASTA is provided
-  -v, --verbose      verbose logging output
+``` bash
+Required:
+  -i, --input        One or more input rinfo files (.txt or .txt.gz)
+      --input_dir    Directory containing rinfo files
+  -o, --output       Output CSV path (long format, MultiQC-compatible) 
+  
+Optional:
+  -s, --sample       Sample ID (only valid for a single input file, otherwise sample names are derived from filenames)
+      --pattern      Regex pattern used with --input_dir
+      --rlen         Read length (default: 151)
+      --skips        Trimmed / ignored bases per read (NanoSeq = 5, xGen = 8)
 
+      --ref_fasta    Reference genome FASTA (enables GC metrics)
+      --skip_gc      TRUE / FALSE; disable GC even if FASTA is provided
+                     (default: TRUE)
+
+      --metrics      Optional comma-separated list of metrics to output
+                     (default: all metrics returned by calculate_metrics_single)
+      --cores        Number of CPU cores for parallel processing
+                     (default: 1)
+                     
+  -v, --verbose      Verbose output
+
+  
 ```
+Note: Specify either --input or --input_dir (not both). When multiple input files are provided, results are combined into one output CSV.
+
 
 #### Sanity check the CLI
 ```bash
-Rscript src/main.R --help
+Rscript main.R --help
+
 ```
 ## Outputs
 
