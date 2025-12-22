@@ -39,6 +39,9 @@ Family stats
 > they are either set to `NA` (when GC is skipped) or the program errors
 > if GC was requested but no reference was given.
 
+
+
+
 ## Installation
 
 - R version 4.4.1
@@ -80,6 +83,13 @@ Rscript main.R \
 ```
 
 #### Example: default, with GC enabled, requires reference genome
+
+Note: The reference genome (.fasta) is user-provided and is not included in this repository.
+Any compatible reference with matching chromosome names may be used.
+
+With the current `test.rinfo` file, GC metrics may return `NA` even if a
+reference genome is provided, due to insufficient genomic information in the
+test data. GC metrics are expected to work correctly on real sequencing data.
 
 ``` bash
 Rscript main.R \

@@ -1,4 +1,24 @@
+# ------------------------------------------------------------------
+# efficiency_nanoseq_functions.R
+#
+# Core implementations of duplex-specific metric calculations.
+#
+# This script defines functions for computing individual and grouped
+# duplex sequencing metrics from summarised rinfo data.
+# It is not intended to be run as a standalone script.
+#
+# The functions are sourced by `calc_duplex_metrics.R` and executed
+# within a controlled environment that provides required context
+# (e.g. rlen, skips, and reference genome objects for GC metrics).
+#
+# Metric selection, input validation, and single-/multi-file input
+# are handled by higher-level scripts (main.R, cli.R, calculate.R).
+#
 # Code obtained from https://github.com/WEHIGenomicsRnD/G000204_duplex/blob/main/code/efficiency_nanoseq_functions.R
+# ------------------------------------------------------------------
+
+
+
 
 # Efficiency metric calculations
 calculate_singletons <- function(rbs) {

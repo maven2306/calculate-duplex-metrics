@@ -1,4 +1,16 @@
-# R/cli.R
+# ------------------------------------------------------------------
+# cli.R
+#
+# Command-line interface for calculating duplex sequencing metrics.
+#
+# Defines the main CLI entrypoint, parses and validates command-line
+# arguments, resolves input files, and delegates computation to
+# `process_data()` in calculate.R.
+#
+# This script is executed via `main.R`.
+# ------------------------------------------------------------------
+
+
 suppressPackageStartupMessages({
   library(argparse)   # install.packages("argparse") or use renv::restore()
 })
@@ -118,7 +130,7 @@ parse_arguments <- function() {
     stop("Input file(s) not found:\n", paste(missing, collapse = "\n"))
   }
   
-  # normalise paths (optional but recommended)
+  # normalise paths
   args$input <- normalizePath(args$input, mustWork = TRUE)
   
   # sample sanity 
@@ -126,6 +138,9 @@ parse_arguments <- function() {
     stop("--sample can only be used with a single input file")
   }
   
+  # validate numeric CLI arguments early to avoid invalid metric computation
+  if (is.na(args$rlen) || args$rlen <= 0)  stop("--rlen must be positive")
+  if (is.na(args$skips) || args$skips < 0) stop("--skips must be >= 0")
   
   # output dir 
   odir <- dirname(args$output)

@@ -1,5 +1,15 @@
 #!/usr/bin/env Rscript
 
+# ------------------------------------------------------------------
+# main.R
+#
+# CLI entrypoint for the duplex metric calculation tool.
+#
+# This script initialises the runtime environment, ensures required
+# packages are available, sources the CLI implementation, and invokes
+# the `main()` function defined in cli.R.
+# ------------------------------------------------------------------
+
 # Source required functions
 source("R/cli.R")
 

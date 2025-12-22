@@ -13,7 +13,7 @@
 #   and applies them to rinfo files using a metric-group–based approach.
 #
 #   Metrics are organised into logical groups:
-#     - basic   : frac_singletons, efficiency, drop_out_rate
+#     - individual   : frac_singletons, efficiency, drop_out_rate
 #     - gc      : gc_single, gc_both, gc_deviation
 #     - family  : total_families, family_mean, family_median, family_max,
 #                 families_gt1, single_families, paired_families,
@@ -168,7 +168,7 @@ calc_duplex_metrics_many_files_df <- function(
   
   inputs <- normalizePath(inputs, mustWork = TRUE)
   
-  worker <- function(f) {
+  process_one_file <- function(f) {
     calc_duplex_metrics_one_file_df(
       input = f,
       sample = NULL,          # default derived from filename
@@ -183,9 +183,9 @@ calc_duplex_metrics_many_files_df <- function(
   
   # macOS/Linux: use mclapply when cores > 1, Windows falls back to serial
   if (cores > 1 && .Platform$OS.type != "windows") {
-    out_list <- parallel::mclapply(inputs, worker, mc.cores = cores)
+    out_list <- parallel::mclapply(inputs, process_one_file, mc.cores = cores)
   } else {
-    out_list <- lapply(inputs, worker)
+    out_list <- lapply(inputs, process_one_file)
   }
   
   data.table::rbindlist(out_list, use.names = TRUE, fill = TRUE) |> as.data.frame()
