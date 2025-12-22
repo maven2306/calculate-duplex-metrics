@@ -50,9 +50,8 @@ process_data <- function(
     }
     
     ok <- tryCatch({
-      calc_duplex_metrics_one_file(
+      out_df <- calc_duplex_metrics_one_file_df(
         input       = input,
-        output      = output,
         sample      = sample,
         rlen        = rlen,
         skips       = skips,
@@ -60,6 +59,7 @@ process_data <- function(
         skip_gc     = skip_gc,
         metrics_arg = metrics
       )
+      write.csv(out_df, output, row.names = FALSE, quote = FALSE)
       TRUE
     }, error = function(e) e)
     

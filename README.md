@@ -4,12 +4,19 @@ An R CLI tool to take in summarised read information and output a variety of dup
 
 ### Available metrics
 
+Individual metrics (selectable individually)
 - frac_singletons
 - efficiency
 - drop_out_rate
+
+Grouped metrics
+
+GC metrics 
 - gc_single
 - gc_both
 - gc_deviation
+
+Family stats
 - total_families
 - family_mean
 - family_median
@@ -24,6 +31,9 @@ An R CLI tool to take in summarised read information and output a variety of dup
 > argument parsing and validation. Computation is orchestrated in
 > `calculate.R` and delegated to `R/calc_duplex_metrics.R`, which sources
 > metric logic from `R/efficiency_nanoseq_functions.R`.
+>
+> Metric selection is resolved before computation.
+> Only the requested individual metrics and/or metric groups are computed
 >
 > GC metrics are computed when a reference FASTA is provided; otherwise
 > they are either set to `NA` (when GC is skipped) or the program errors
@@ -59,59 +69,69 @@ BiocManager::install(c('Biostrings', 'GenomicRanges', 'IRanges', 'Rsamtools'))
 ## Usage
 
 
-#### Example (no GC computation):
+#### Example: default, no GC computation
 
 ``` bash
 Rscript main.R \
   --input data/test.rinfo \
   --output test_duplex_metrics.csv \
-  --sample test \
   --skip_gc TRUE
 
 ```
 
-#### Example (with GC enabled, requires reference genome):
+#### Example: default, with GC enabled, requires reference genome
 
 ``` bash
 Rscript main.R \
   --input data/test.rinfo \
   --output test_duplex_metrics_gc.csv \
-  --sample test \
   --ref_fasta ref/Escherichia_coli_ATCC_10798.fasta \
   --skip_gc FALSE
 
 ```
 
-#### Example (select specific metrics)
+#### Example: select individual metrics only
 
 ``` bash
 Rscript main.R \
   --input data/test.rinfo \
   --output test_selected_metrics.csv \
-  --sample test \
   --metrics efficiency,drop_out_rate \
   --skip_gc TRUE
 ```
 
-#### Example (multiple input files)
+#### Example: select metric groups
+
+``` bash
+Rscript main.R \
+  --input data/test.rinfo \
+  --output test_family_metrics.csv \
+  --metrics family \
+  --skip_gc TRUE
+```
+
+#### Example: mixed selection (individual + group)
+``` bash
+Rscript main.R \
+  --input data/test.rinfo \
+  --output test_mixed_metrics.csv \
+  --metrics efficiency,family \
+  --skip_gc TRUE
+
+```
+
+#### Example: multiple input files
 
 ``` bash
 Rscript main.R \
   --input data/a.rinfo data/b.rinfo \
   --output all_samples_metrics.csv \
+  --metrics family \
   --skip_gc TRUE \
   --cores 2
-```
-
-#### Example (input directory + pattern)
-``` bash
-Rscript main.R \
-  --input_dir data \
-  --pattern "\\.rinfo(\\.gz)?$" \
-  --output all_samples_metrics.csv \
-  --skip_gc TRUE
 
 ```
+
 
 ### CLI flags
 
@@ -119,55 +139,44 @@ Rscript main.R \
 Required:
   -i, --input        One or more input rinfo files (.txt or .txt.gz)
       --input_dir    Directory containing rinfo files
-  -o, --output       Output CSV path (long format, MultiQC-compatible) 
-  
+  -o, --output       Output CSV path (long format, MultiQC-compatible)
+
 Optional:
-  -s, --sample       Sample ID (only valid for a single input file, otherwise sample names are derived from filenames)
+  -s, --sample       Sample ID (only valid for a single input file;
+                     otherwise sample names are derived from filenames)
+
       --pattern      Regex pattern used with --input_dir
       --rlen         Read length (default: 151)
       --skips        Trimmed / ignored bases per read (NanoSeq = 5, xGen = 8)
 
-      --ref_fasta    Reference genome FASTA (enables GC metrics)
+      --ref_fasta    Reference genome FASTA (required for GC metrics)
       --skip_gc      TRUE / FALSE; disable GC even if FASTA is provided
                      (default: TRUE)
 
-      --metrics      Optional comma-separated list of metrics to output
-                     (default: all metrics returned by calculate_metrics_single)
+      --metrics      Optional comma-separated list of metrics and/or metric groups
+                     - Individual metrics: frac_singletons, efficiency, drop_out_rate
+                     - Metric groups: gc, family
+                     (default: all metrics)
+
       --cores        Number of CPU cores for parallel processing
                      (default: 1)
-                     
+
   -v, --verbose      Verbose output
+
 
   
 ```
 Note: Specify either --input or --input_dir (not both). When multiple input files are provided, results are combined into one output CSV.
 
 
-#### Sanity check the CLI
-```bash
-Rscript main.R --help
 
-```
 ## Outputs
 
-```         
-sample,metric,value
-<sample_id>,frac_singletons,<num>
-<sample_id>,efficiency,<num>
-<sample_id>,drop_out_rate,<num>
-<sample_id>,gc_single,<num_or_NA>
-<sample_id>,gc_both,<num_or_NA>
-<sample_id>,gc_deviation,<num_or_NA>
-<sample_id>,total_families,<int>
-<sample_id>,family_mean,<num>
-<sample_id>,family_median,<num>
-<sample_id>,family_max,<int>
-<sample_id>,families_gt1,<int>
-<sample_id>,single_families,<int>
-<sample_id>,paired_families,<int>
-<sample_id>,paired_and_gt1,<int>
-
+Output is written in long format:
 ```
+sample,metric,value
+
+``` 
 
 #### Example:
 
@@ -187,5 +196,12 @@ test,families_gt1,5
 test,single_families,4
 test,paired_families,4
 test,paired_and_gt1,3
+
+```
+
+
+#### Sanity check the CLI
+```bash
+Rscript main.R --help
 
 ```

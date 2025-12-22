@@ -67,7 +67,7 @@ parse_arguments <- function() {
   p$add_argument("--skip_gc", default = "TRUE",
                  help = "TRUE/FALSE; disable GC even if FASTA is provided (default: TRUE)")
   p$add_argument("--metrics", default = "",
-                 help = "Optional comma-separated list of metrics to output (default: all)")
+                 help = "Comma-separated metric groups or metric names (basic,gc,family). Default: all")
   p$add_argument("-v", "--verbose", action = "store_true",
                  help = "Verbose output")
   

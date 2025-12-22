@@ -21,46 +21,131 @@ calculate_family_stats <- function(rbs) {
 }
 
 calculate_metrics <- function(rbs) {
-    metrics <- data.frame(sample = names(rbs))
-    metrics$frac_singletons <- lapply(rbs, calculate_singletons) %>% unlist()
-    metrics$efficiency <- lapply(rbs, calculate_efficiency) %>% unlist()
-    metrics$drop_out_rate <- lapply(rbs, calculate_missed_fraction) %>% unlist()
-    metrics <- lapply(rbs, calculate_gc) %>%
-                    data.frame %>% t() %>%
-                    cbind(metrics, .)
-    metrics <- lapply(rbs, calculate_family_stats) %>%
-                    data.frame %>% t() %>%
-                    cbind(metrics, .)
-    return(metrics)
+  metrics <- data.frame(sample = names(rbs))
+  metrics$frac_singletons <- lapply(rbs, calculate_singletons) %>% unlist()
+  metrics$efficiency <- lapply(rbs, calculate_efficiency) %>% unlist()
+  metrics$drop_out_rate <- lapply(rbs, calculate_missed_fraction) %>% unlist()
+  
+  metrics <- lapply(rbs, function(x) calculate_gc(x, genomeFile = genomeFile, genome_max = genome_max)) %>%
+    data.frame %>% t() %>%
+    cbind(metrics, .)
+  
+  metrics <- lapply(rbs, calculate_family_stats) %>%
+    data.frame %>% t() %>%
+    cbind(metrics, .)
+  return(metrics)
 }
 
-calculate_metrics_single <- function(rbs) {
-    metrics <- NULL
-    metrics$frac_singletons <- calculate_singletons(rbs)
-    metrics$efficiency <- calculate_efficiency(rbs)
-    metrics$drop_out_rate <- calculate_missed_fraction(rbs)
 
+
+# --- Metric grouping / selection ---------
+
+.individual_metrics <- c("frac_singletons", "efficiency", "drop_out_rate")
+
+.metric_groups <- list(
+  gc = c("gc_single", "gc_both", "gc_deviation"),
+  family = c(
+    "total_families", "family_mean", "family_median", "family_max",
+    "families_gt1", "single_families", "paired_families", "paired_and_gt1"
+  )
+)
+
+# Resolve --metrics into:
+# - groups: grouped metrics to compute (gc/family)
+# - individual: other metrics to compute individually (efficiency, drop_out_rate, frac_singletons)
+#
+# Rules:
+# - empty / NULL -> compute all avaliable metrics
+# - token "gc" or "family" -> compute that whole group
+# - token is a individual metric name -> compute only that metric
+# - token is a metric inside gc/family -> compute the whole group 
+resolve_metric_selection <- function(metrics_arg = NULL) {
+  if (is.null(metrics_arg) || !nzchar(metrics_arg)) {
+    return(list(groups = names(.metric_groups), individual = .individual_metrics))
+  }
+  
+  tokens <- trimws(unlist(strsplit(metrics_arg, ",")))
+  tokens <- tokens[nzchar(tokens)]
+  
+  groups <- character(0)
+  individual  <- character(0)
+  
+  for (tok in tokens) {
+    if (tok %in% names(.metric_groups)) {
+      groups <- union(groups, tok)
+      next
+    }
+    if (tok %in% .individual_metrics) {
+      individual <- union(individual, tok)
+      next
+    }
+    
+    # if metric name inside a group, map to its group
+    hit <- names(Filter(function(v) tok %in% v, .metric_groups))
+    if (length(hit) > 0) {
+      groups <- union(groups, hit)
+      next
+    }
+    
+    stop("Unknown metric/group in --metrics: ", tok,
+         "\nValid groups: ", paste(names(.metric_groups), collapse = ", "),
+         "\nInidividual metrics: ", paste(.individual_metrics, collapse = ", "),
+         "\nGrouped metrics: ", paste(unique(unlist(.metric_groups)), collapse = ", "))
+  }
+  
+  list(groups = groups, individual = individual)
+}
+
+# Compute selected metrics (returns 1-row data.frame)
+calculate_metrics_selected <- function(rbs,
+                                       groups = c("gc", "family"),
+                                       individual = character(0)) {
+  metrics <- list()
+  
+  if ("frac_singletons" %in% individual) metrics$frac_singletons <- calculate_singletons(rbs)
+  if ("efficiency" %in% individual)      metrics$efficiency      <- calculate_efficiency(rbs)
+  if ("drop_out_rate" %in% individual)   metrics$drop_out_rate   <- calculate_missed_fraction(rbs)
+  
+  if ("gc" %in% groups) {
     gc_stats <- calculate_gc(rbs, genomeFile = genomeFile, genome_max = genome_max)
-    family_stats <- calculate_family_stats(rbs)
-    metrics <- data.frame(metrics, t(gc_stats))
-    metrics <- data.frame(metrics, t(family_stats))
-
-    return(metrics)
+    metrics <- c(metrics, as.list(gc_stats))
+  }
+  
+  if ("family" %in% groups) {
+    fam_stats <- calculate_family_stats(rbs)
+    metrics <- c(metrics, as.list(fam_stats))
+  }
+  
+  as.data.frame(metrics, check.names = FALSE)
 }
 
-calc_metrics_new_rbs <- function(rinfo_dir, pattern="\\.txt.gz", cores=8) {
-    metrics <-
-        list.files(
-            rinfo_dir,
-            full.names = TRUE,
-            recursive = TRUE,
-            pattern = pattern
-        ) %>%
-        mclapply(., fread, mc.cores=cores) %>%
-        mclapply(., calculate_metrics_single, mc.cores=cores)
 
-    return(metrics) 
+
+calc_metrics_new_rbs <- function(rinfo_dir, pattern="\\.txt.gz", cores=8,
+                                 metrics_arg = "", genomeFile = NULL, genome_max = NULL) {
+  groups <- resolve_metric_groups(metrics_arg)
+  
+  metrics <-
+    list.files(rinfo_dir, full.names = TRUE, recursive = TRUE, pattern = pattern) %>%
+    mclapply(., fread, mc.cores = cores) %>%
+    mclapply(., function(one_rbs) {
+      if ("gc" %in% groups) {
+        if (is.null(genomeFile) || is.null(genome_max)) {
+          stop("GC requested but genomeFile/genome_max not provided to calc_metrics_new_rbs().")
+        }
+        local_genomeFile <- genomeFile
+        local_genome_max <- genome_max
+        genomeFile <- local_genomeFile
+        genome_max <- local_genome_max
+      }
+      calculate_metrics_selected(one_rbs, groups = groups)
+    }, mc.cores = cores)
+  
+  return(metrics)
 }
+
+
+
 
 # functions below are adapted from
 # R/efficiency_nanoseq.R and perl/efficiency_nanoseq.pl
