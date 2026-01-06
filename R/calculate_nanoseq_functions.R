@@ -1,5 +1,5 @@
 # ------------------------------------------------------------------
-# efficiency_nanoseq_functions.R
+# calculate_nanoseq_functions.R
 #
 # Core implementations of duplex-specific metric calculations.
 #
