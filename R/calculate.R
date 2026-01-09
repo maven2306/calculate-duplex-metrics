@@ -159,7 +159,7 @@ process_data <- function(
     skip_gc = TRUE,
     metrics = "",
     cores = 1,
-    func_file = file.path("R", "efficiency_nanoseq_functions.R")
+    func_file = file.path("R", "calculate_nanoseq_functions.R")
 ) {
   # validate input
   if (is.null(input) || length(input) == 0) {
@@ -175,7 +175,7 @@ process_data <- function(
   
   # CHANGED - Load calculation functions once
   if (!file.exists(func_file)) {
-    return(list(success = FALSE, error = paste0("Can't find efficiency_nanoseq_functions.R at: ", func_file)))
+    return(list(success = FALSE, error = paste0("Can't find calculate_nanoseq_functions.R at: ", func_file)))
   }
   fn_env <- new.env(parent = .GlobalEnv)
   assign("rlen",  rlen,  envir = fn_env)

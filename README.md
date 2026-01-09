@@ -30,7 +30,7 @@ Family stats
 > Internals: the CLI entrypoint is `main.R`, which invokes `cli.R` for
 > argument parsing and validation. Computation is orchestrated in
 > `calculate.R` and delegated to `R/calc_duplex_metrics.R`, which sources
-> metric logic from `R/efficiency_nanoseq_functions.R`.
+> metric logic from `R/calculate_nanoseq_functions.R`.
 >
 > Metric selection is resolved before computation.
 > Only the requested individual metrics and/or metric groups are computed
