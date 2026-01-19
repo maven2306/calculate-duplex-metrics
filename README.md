@@ -26,48 +26,42 @@ Family stats
 - paired_families
 - paired_and_gt1
 
+## Implementation overview
 
-> Internals: the CLI entrypoint is `main.R`, which invokes `cli.R` for
-> argument parsing and validation. Computation is orchestrated in
-> `calculate.R` and delegated to `R/calc_duplex_metrics.R`, which sources
-> metric logic from `R/calculate_nanoseq_functions.R`.
->
-> Metric selection is resolved before computation.
-> Only the requested individual metrics and/or metric groups are computed
->
-> GC metrics are computed when a reference FASTA is provided; otherwise
-> they are either set to `NA` (when GC is skipped) or the program errors
-> if GC was requested but no reference was given.
+- The CLI entrypoint is `main.R`
+- Argument parsing and validation are handled in `cli.R`
+- Metric execution logic is in `calculate.R`
+- Core metric implementations are defined in `R/calculate_nanoseq_functions.R`
 
+Metric selection is resolved **before computation**.  
+Only the requested individual metrics and/or metric groups are evaluated.
 
+### GC metric behaviour
+- GC metrics are computed **only when a reference is provided**
+- In default mode (no `--metrics` specified):
+   -if --ref_fasta is not provided, GC metrics are not computed
+   -if --ref_fasta is provided, GC metrics are computed (may return NA if insufficient data)
+- If GC metrics are explicitly requested (e.g. `--metrics gc`) but no
+  reference FASTA is supplied, the program exits with an error
 
 
 ## Installation
 
-- R version 4.4.1
-- Packages: `argparse`, `magrittr`, `data.table`, `R.utils`, `Biostrings`,  
-  `GenomicRanges`, `IRanges`, `Rsamtools`
+### Requirement
+- R version **4.4.1**
 
-## Using renv (recommended)
+### Using `renv` 
 
-```r
-R -q -e "install.packages('renv', repos = 'https://cloud.r-project.org'); renv::restore()"
+This project uses `renv` to ensure reproducible dependency management.
 
-```  
-
-## Or install manually (not use renv)
+From the project root directory:
 
 ```r
-install.packages(
-  c('argparse', 'magrittr', 'data.table', 'R.utils'),
-  repos = 'https://cloud.r-project.org'
-)
+install.packages("renv", repos = "https://cloud.r-project.org")
+renv::restore()
 
-if (!requireNamespace('BiocManager', quietly = TRUE)) {
-  install.packages('BiocManager', repos = 'https://cloud.r-project.org')
-}
-BiocManager::install(c('Biostrings', 'GenomicRanges', 'IRanges', 'Rsamtools'))
-```  
+```
+
 
 ## Usage
 
@@ -76,27 +70,21 @@ BiocManager::install(c('Biostrings', 'GenomicRanges', 'IRanges', 'Rsamtools'))
 
 ``` bash
 Rscript main.R \
-  --input data/test.rinfo \
-  --output test_duplex_metrics.csv \
-  --skip_gc TRUE
+  --input data/NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001.txt \
+  --output out/default.csv
 
 ```
 
-#### Example: default, with GC enabled, requires reference genome
+#### Example: default mode with GC enabled (requires reference genome)
 
-Note: The reference genome (.fasta) is user-provided and is not included in this repository.
-Any compatible reference with matching chromosome names may be used.
-
-With the current `test.rinfo` file, GC metrics may return `NA` even if a
-reference genome is provided, due to insufficient genomic information in the
-test data. GC metrics are expected to work correctly on real sequencing data.
+Note: The reference genome FASTA is user-provided and not included
+in this repository. Any compatible reference genome may be used.
 
 ``` bash
 Rscript main.R \
-  --input data/test.rinfo \
-  --output test_duplex_metrics_gc.csv \
-  --ref_fasta ref/Escherichia_coli_ATCC_10798.fasta \
-  --skip_gc FALSE
+  --input data/NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001.txt \
+  --output out/default_with_gc.csv \
+  --ref_fasta ref/Escherichia_coli_ATCC_10798.fasta
 
 ```
 
@@ -104,40 +92,37 @@ Rscript main.R \
 
 ``` bash
 Rscript main.R \
-  --input data/test.rinfo \
-  --output test_selected_metrics.csv \
-  --metrics efficiency,drop_out_rate \
-  --skip_gc TRUE
+  --input data/NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001.txt \
+  --output out/test_selected_metrics.csv \
+  --metrics efficiency,drop_out_rate
 ```
+Note: when listing multiple metrics, either omit spaces (efficiency,drop_out_rate) or quote the argument ("efficiency, drop_out_rate").
 
 #### Example: select metric groups
 
 ``` bash
 Rscript main.R \
-  --input data/test.rinfo \
-  --output test_family_metrics.csv \
-  --metrics family \
-  --skip_gc TRUE
+  --input data/NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001.txt \
+  --output out/test_family_metrics.csv \
+  --metrics family
 ```
 
 #### Example: mixed selection (individual + group)
+
 ``` bash
 Rscript main.R \
-  --input data/test.rinfo \
-  --output test_mixed_metrics.csv \
-  --metrics efficiency,family \
-  --skip_gc TRUE
-
+  --input data/NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001.txt \
+  --output out/test_mixed_metrics.csv \
+  --metrics efficiency,family
 ```
 
 #### Example: multiple input files
 
 ``` bash
 Rscript main.R \
-  --input data/a.rinfo data/b.rinfo \
-  --output all_samples_metrics.csv \
+  --input data/a.txt data/b.txt \
+  --output out/all_samples_metrics.csv \
   --metrics family \
-  --skip_gc TRUE \
   --cores 2
 
 ```
@@ -149,35 +134,27 @@ Rscript main.R \
 Required:
   -i, --input        One or more input rinfo files (.txt or .txt.gz)
       --input_dir    Directory containing rinfo files
-  -o, --output       Output CSV path (long format, MultiQC-compatible)
+  -o, --output       Output CSV path (long format)
 
 Optional:
-  -s, --sample       Sample ID (only valid for a single input file;
-                     otherwise sample names are derived from filenames)
+  -s, --sample       Optional sample name(s). For multiple inputs, provide
+                     comma-separated names matching the number of files
 
       --pattern      Regex pattern used with --input_dir
       --rlen         Read length (default: 151)
       --skips        Trimmed / ignored bases per read (NanoSeq = 5, xGen = 8)
 
       --ref_fasta    Reference genome FASTA (required for GC metrics)
-      --skip_gc      TRUE / FALSE; disable GC even if FASTA is provided
-                     (default: TRUE)
 
-      --metrics      Optional comma-separated list of metrics and/or metric groups
-                     - Individual metrics: frac_singletons, efficiency, drop_out_rate
-                     - Metric groups: gc, family
+      --metrics      Comma-separated list of metrics and/or metric groups
+                     - Individual: frac_singletons, efficiency, drop_out_rate
+                     - Groups: gc, family
                      (default: all metrics)
 
-      --cores        Number of CPU cores for parallel processing
-                     (default: 1)
+      --cores        Number of CPU cores for parallel processing (default: 1) 
 
-  -v, --verbose      Verbose output
-
-
-  
 ```
-Note: Specify either --input or --input_dir (not both). When multiple input files are provided, results are combined into one output CSV.
-
+Note: when listing multiple metrics, either omit spaces (efficiency,drop_out_rate) or quote the argument ("efficiency, drop_out_rate").
 
 
 ## Outputs
@@ -190,22 +167,19 @@ sample,metric,value
 
 #### Example:
 
-```         
+```
 sample,metric,value
-test,frac_singletons,0.089
-test,efficiency,0.064
-test,drop_out_rate,-0.033
-test,gc_single,NA
-test,gc_both,NA
-test,gc_deviation,NA
-test,total_families,9
-test,family_mean,5
-test,family_median,3
-test,family_max,13
-test,families_gt1,5
-test,single_families,4
-test,paired_families,4
-test,paired_and_gt1,3
+NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,frac_singletons,0.0418706803079419
+NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,efficiency,0.0490258329591602
+NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,drop_out_rate,0.320805646128878
+NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,total_families,23825702
+NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,family_mean,6.748161712309
+NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,family_median,5
+NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,family_max,50
+NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,families_gt1,16771629
+NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,single_families,6731955
+NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,paired_families,9994045
+NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,paired_and_gt1,8152302
 
 ```
 
