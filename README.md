@@ -37,12 +37,11 @@ Metric selection is resolved **before computation**.
 Only the requested individual metrics and/or metric groups are evaluated.
 
 ### GC metric behaviour
-- GC metrics are computed **only when a reference is provided**
-- In default mode (no `--metrics` specified):
-   -if --ref_fasta is not provided, GC metrics are not computed
-   -if --ref_fasta is provided, GC metrics are computed (may return NA if insufficient data)
-- If GC metrics are explicitly requested (e.g. `--metrics gc`) but no
-  reference FASTA is supplied, the program exits with an error
+- GC metrics are computed only when a reference genome object (.fasta) is provided.
+- `--metrics` defaults to `all`.
+  - If `--ref_fasta` is not provided, GC metrics are skipped and a message is printed to the console.
+  - If `--ref_fasta` is provided, GC metrics are computed (may return NA if insufficient data).
+- If GC metrics are explicitly requested (e.g. `--metrics gc`) but no reference FASTA is supplied, the program exits with an error.
 
 
 ## Installation
@@ -132,15 +131,19 @@ Rscript main.R \
 
 ``` bash
 Required:
-  -i, --input        One or more input rinfo files (.txt or .txt.gz)
-      --input_dir    Directory containing rinfo files
+  -i, --input        One or more input rinfo files OR a directory containing rinfo files (.txt or .txt.gz)
+                     Note: when --input is a directory, the tool selects matching files using --pattern (default: \.txt(\.gz)?$);
+                           when --input is a list of files, --pattern is ignored
   -o, --output       Output CSV path (long format)
 
 Optional:
-  -s, --sample       Optional sample name(s). For multiple inputs, provide
-                     comma-separated names matching the number of files
+  -s, --sample       Optional sample name(s). For multiple input files, provide
+                     comma-separated names matching the number of files.
+                     Note: if --input is a directory, --sample is not allowed.
 
-      --pattern      Regex pattern used with --input_dir
+      --pattern      Regex pattern used to select files when --input is a directory
+                     (default: \.txt(\.gz)?$)
+
       --rlen         Read length (default: 151)
       --skips        Trimmed / ignored bases per read (NanoSeq = 5, xGen = 8)
 
@@ -149,9 +152,10 @@ Optional:
       --metrics      Comma-separated list of metrics and/or metric groups
                      - Individual: frac_singletons, efficiency, drop_out_rate
                      - Groups: gc, family
-                     (default: all metrics)
+                     (default: all)
 
-      --cores        Number of CPU cores for parallel processing (default: 1) 
+      --cores        Number of CPU cores for parallel processing (default: 1)
+
 
 ```
 Note: when listing multiple metrics, either omit spaces (efficiency,drop_out_rate) or quote the argument ("efficiency, drop_out_rate").

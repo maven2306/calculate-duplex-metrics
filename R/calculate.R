@@ -36,27 +36,40 @@ suppressPackageStartupMessages({
 
 
 # ------------------------------------------------------------------
-# CHANGED - Helper functions: no argument parsing; read inputs and compute metrics
+# CHANGED - Helper functions: no CLI argument parsing or validation, 
+# inputs are assumed to be validated upstream.
 # ------------------------------------------------------------------
 
 parse_samples <- function(sample_arg, inputs) {
   n <- length(inputs)
   
-  if (is.null(sample_arg) || !nzchar(sample_arg)) {
+  # default: derive sample names from filenames
+  if (is.null(sample_arg) || length(sample_arg) == 0) {
     return(sub("\\.txt(\\.gz)?$", "", basename(inputs), ignore.case = TRUE))
   }
   
-  samples <- trimws(strsplit(sample_arg, ",", fixed = TRUE)[[1]])
-  samples <- samples[nzchar(samples)]
+  # if cli.R already parsed it into a vector (e.g. c("S1","S2"))
+  if (length(sample_arg) > 1) {
+    samples <- trimws(sample_arg)
+    samples <- samples[nzchar(samples)]
+  } else {
+    # otherwise treat it as a comma-separated string
+    if (!nzchar(sample_arg)) {
+      return(sub("\\.txt(\\.gz)?$", "", basename(inputs), ignore.case = TRUE))
+    }
+    samples <- trimws(unlist(strsplit(sample_arg, ",", fixed = TRUE)))
+    samples <- samples[nzchar(samples)]
+  }
   
   if (n == 1 && length(samples) == 1) return(samples)
   
   if (length(samples) != n) {
-    stop("--sample must contain the same number of names as --input files (comma-separated).")
+    stop("--sample must contain the same number of names as --input files.")
   }
   
   samples
 }
+
 
 
 calc_duplex_metrics_one_file_df <- function(
@@ -153,13 +166,18 @@ process_data <- function(
     rlen = 151,
     skips = 5,
     ref_fasta = "",
-    metrics = "",
+    metrics = "all",
     cores = 1,
     func_file = file.path("R", "calculate_nanoseq_functions.R")
 ) {
   # validate input
   if (is.null(input) || length(input) == 0) {
     return(list(success = FALSE, error = "No input files provided"))
+  }
+  
+  missing <- input[!file.exists(input)]
+  if (length(missing) > 0) {
+    return(list(success = FALSE, error = paste0("Input file(s) not found:\n", paste(missing, collapse = "\n"))))
   }
   
   if (is.na(cores) || cores < 1) {
@@ -190,8 +208,11 @@ process_data <- function(
   gc_requested <- "gc" %in% groups_to_compute
   has_ref <- nzchar(ref_fasta) && file.exists(ref_fasta)
   
-  explicit_metrics <- !is.null(metrics) && nzchar(metrics)
+  metrics_norm <- if (is.null(metrics)) "" else tolower(gsub("\\s+", "", metrics))
+  is_default_all <- identical(metrics_norm, "") || identical(metrics_norm, "all")
+  explicit_metrics <- !is_default_all
   
+
   # If GC is requested but we can't compute it:
   # - default mode (metrics empty): skip GC
   # - explicit mode (user asked for gc/gc_single etc.): fail with clear error
@@ -207,7 +228,8 @@ process_data <- function(
       return(list(success = FALSE, error = msg))
     }
     
-    # default mode: skip GC and continue
+    # default/all mode: skip GC and continue
+    message("GC metrics skipped because --ref_fasta was not provided or was not found.")
     groups_to_compute <- setdiff(groups_to_compute, "gc")
     ref_fasta <- ""
   }
@@ -227,12 +249,6 @@ process_data <- function(
     genome_max <- setNames(as.integer(Biostrings::width(fa)), fa_names)
   }
   
-  
-  # Validate inputs exist
-  missing <- input[!file.exists(input)]
-  if (length(missing) > 0) {
-    return(list(success = FALSE, error = paste0("Input file(s) not found:\n", paste(missing, collapse = "\n"))))
-  }
   
   # Parse samples for single/multi input
   samples <- parse_samples(sample, input)
@@ -275,6 +291,9 @@ process_data <- function(
   
   if (inherits(write_result, "error")) return(list(success = FALSE, error = paste0("Write failed: ", write_result$message)))
   
+  if (!is.null(genomeFile)) {
+    try(close(genomeFile), silent = TRUE)
+  }
   list(success = TRUE)
 }
   

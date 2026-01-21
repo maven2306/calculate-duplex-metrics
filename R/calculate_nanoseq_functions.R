@@ -109,6 +109,9 @@ calculate_gc <- function(
   rbs <- data.frame(rbs)
   colnames(rbs)[5:6] <- c("plus", "minus")
   
+  if (is.null(genome_max) || length(genome_max) == 0) {
+    return(c(gc_single = NA_real_, gc_both = NA_real_, gc_deviation = NA_real_))
+  }
   # remove any chroms not in the sizes vector
   rbs <- rbs[rbs$chrom %in% names(genome_max), ]
 
@@ -208,20 +211,24 @@ calculate_gc <- function(
 # - individual: other metrics to compute individually (efficiency, drop_out_rate, frac_singletons)
 #
 # Rules:
-# - empty / NULL -> compute all avaliable metrics
+# - empty / NULL -> compute all available metrics
 # - token "gc" or "family" -> compute that whole group
 # - token is a individual metric name -> compute only that metric
 # - token is a metric inside gc/family -> compute the whole group 
 resolve_metric_selection <- function(metrics_arg = NULL) {
-  if (is.null(metrics_arg) || !nzchar(metrics_arg)) {
+  
+  metrics_norm <- if (is.null(metrics_arg)) "" else tolower(gsub("\\s+", "", metrics_arg))
+  
+  # default/all mode
+  if (!nzchar(metrics_norm) || identical(metrics_norm, "all")) {
     return(list(groups = names(.metric_groups), individual = .individual_metrics))
   }
   
-  tokens <- trimws(unlist(strsplit(metrics_arg, ",")))
+  tokens <- unlist(strsplit(metrics_norm, ","))
   tokens <- tokens[nzchar(tokens)]
   
   groups <- character(0)
-  individual  <- character(0)
+  individual <- character(0)
   
   for (tok in tokens) {
     if (tok %in% names(.metric_groups)) {
@@ -249,6 +256,7 @@ resolve_metric_selection <- function(metrics_arg = NULL) {
   list(groups = groups, individual = individual)
 }
 
+
 # Compute selected metrics (returns 1-row data.frame)
 calculate_metrics_selected <- function(
     rbs,
@@ -267,7 +275,8 @@ calculate_metrics_selected <- function(
   
   if ("gc" %in% groups) {
     if (is.null(genomeFile) || is.null(genome_max)) {
-      stop("GC metrics requested but genomeFile/genome_max were not provided.")
+      stop("GC metrics requested but required genome objects were not provided. ",
+           "Please supply --ref_fasta (or ensure GC is not selected).")
     }
     gc_stats <- calculate_gc(
       rbs,
