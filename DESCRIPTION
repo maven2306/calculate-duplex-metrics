@@ -10,10 +10,13 @@ RoxygenNote: 7.2.3
 Depends: 
     R (>= 4.0.0)
 Imports:
-    argparse
+    argparse,
     data.table,
-    dplyr,
     magrittr,
-    R.utils
+    seqinr,
+    Rsamtools,
+    Biostrings,
+    GenomicRanges,
+    IRanges
 Suggests:
     testthat (>= 3.0.0)

@@ -2,71 +2,194 @@
 
 An R CLI tool to take in summarised read information and output a variety of duplex metrics.
 
-**QC metrics:** `efficiency`, `drop_out_rate`.
+### Available metrics
 
-> Internals: the CLI entrypoint is `main.R` (argument parsing + I/O). It delegates computation to `R/calc_duplex_metrics.R`, which sources from the `src/efficiency_nanoseq_functions.R`. GC metrics are disabled for MVP to avoid extra genome/Bioc dependencies.
+Individual metrics (selectable individually)
+- frac_singletons
+- efficiency
+- drop_out_rate
+
+Grouped metrics
+
+GC metrics 
+- gc_single
+- gc_both
+- gc_deviation
+
+Family stats
+- total_families
+- family_mean
+- family_median
+- family_max
+- families_gt1
+- single_families
+- paired_families
+- paired_and_gt1
+
+## Implementation overview
+
+- The CLI entrypoint is `main.R`
+- Argument parsing and validation are handled in `cli.R`
+- Metric execution logic is in `calculate.R`
+- Core metric implementations are defined in `R/calculate_nanoseq_functions.R`
+
+Metric selection is resolved **before computation**.  
+Only the requested individual metrics and/or metric groups are evaluated.
+
+### GC metric behaviour
+- GC metrics are computed only when a reference genome object (.fasta) is provided.
+- `--metrics` defaults to `all`.
+  - If `--ref_fasta` is not provided, GC metrics are skipped and a message is printed to the console.
+  - If `--ref_fasta` is provided, GC metrics are computed (may return NA if insufficient data).
+- If GC metrics are explicitly requested (e.g. `--metrics gc`) but no reference FASTA is supplied, the program exits with an error.
+
 
 ## Installation
 
--   R version 4.4.1
+### Requirement
+- R version **4.4.1**
 
--   Packages: `argparse`, `magrittr`, `data.table`, `R.utils`
+### Using `renv` 
 
-## Using renv (recommended)
+This project uses `renv` to ensure reproducible dependency management.
 
-```         
-R -q -e "install.packages('renv', repos = '<https://cloud.r-project.org>'); renv::restore()"
+From the project root directory:
+
+```r
+install.packages("renv", repos = "https://cloud.r-project.org")
+renv::restore()
+
 ```
 
-## Or install directly (not use renv)
-
-```         
-install.packages(c("argparse","magrittr","data.table","R.utils"),
-                 repos = "https://cloud.r-project.org")
-```
 
 ## Usage
 
-#### Example:
+
+#### Example: default, no GC computation
 
 ``` bash
 Rscript main.R \
-  --input  "data/test.rinfo" \
-  --output "test_duplex_metrics.csv" \
-  --sample "test" \
-  --rfunc_dir "R/efficiency_nanoseq_functions.R" \
-  --rlen 151 --skips 5
+  --input data/NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001.txt \
+  --output out/default.csv
+
 ```
+
+#### Example: default mode with GC enabled (requires reference genome)
+
+Note: The reference genome FASTA is user-provided and not included
+in this repository. Any compatible reference genome may be used.
+
+``` bash
+Rscript main.R \
+  --input data/NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001.txt \
+  --output out/default_with_gc.csv \
+  --ref_fasta ref/Escherichia_coli_ATCC_10798.fasta
+
+```
+
+#### Example: select individual metrics only
+
+``` bash
+Rscript main.R \
+  --input data/NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001.txt \
+  --output out/test_selected_metrics.csv \
+  --metrics efficiency,drop_out_rate
+```
+Note: when listing multiple metrics, either omit spaces (efficiency,drop_out_rate) or quote the argument ("efficiency, drop_out_rate").
+
+#### Example: select metric groups
+
+``` bash
+Rscript main.R \
+  --input data/NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001.txt \
+  --output out/test_family_metrics.csv \
+  --metrics family
+```
+
+#### Example: mixed selection (individual + group)
+
+``` bash
+Rscript main.R \
+  --input data/NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001.txt \
+  --output out/test_mixed_metrics.csv \
+  --metrics efficiency,family
+```
+
+#### Example: multiple input files
+
+``` bash
+Rscript main.R \
+  --input data/a.txt data/b.txt \
+  --output out/all_samples_metrics.csv \
+  --metrics family \
+  --cores 2
+
+```
+
 
 ### CLI flags
 
-```
-Options:
-  -i, --input     : rinfo file (.txt or .txt.gz)
-  -o, --output    : output CSV path (long format)
-  -s, --sample    : sample ID (defaults to input basename)
-  --rfunc_dir     : folder OR file for efficiency_nanoseq_functions.R
-  --rlen          : read length (default: 151)
-  --skips         : trimmed/ignored bases per read (Nano=5, xGEN=8)
-  -v, --verbose   : verbose logging
-```
+``` bash
+Required:
+  -i, --input        One or more input rinfo files OR a directory containing rinfo files (.txt or .txt.gz)
+                     Note: when --input is a directory, the tool selects matching files using --pattern (default: \.txt(\.gz)?$);
+                           when --input is a list of files, --pattern is ignored
+  -o, --output       Output CSV path (long format)
 
-#### Sanity check the CLI
-```bash
-Rscript src/main.R --help
+Optional:
+  -s, --sample       Optional sample name(s). For multiple input files, provide
+                     comma-separated names matching the number of files.
+                     Note: if --input is a directory, --sample is not allowed.
+
+      --pattern      Regex pattern used to select files when --input is a directory
+                     (default: \.txt(\.gz)?$)
+
+      --rlen         Read length (default: 151)
+      --skips        Trimmed / ignored bases per read (NanoSeq = 5, xGen = 8)
+
+      --ref_fasta    Reference genome FASTA (required for GC metrics)
+
+      --metrics      Comma-separated list of metrics and/or metric groups
+                     - Individual: frac_singletons, efficiency, drop_out_rate
+                     - Groups: gc, family
+                     (default: all)
+
+      --cores        Number of CPU cores for parallel processing (default: 1)
+
+
 ```
+Note: when listing multiple metrics, either omit spaces (efficiency,drop_out_rate) or quote the argument ("efficiency, drop_out_rate").
+
+
 ## Outputs
 
-```         
-sample,metric,value
-<sample>,efficiency,<0–1>
-<sample>,drop_out_rate,<0–1>
+Output is written in long format:
 ```
+sample,metric,value
+
+``` 
 
 #### Example:
 
-```         
+```
 sample,metric,value
+NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,frac_singletons,0.0418706803079419
 NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,efficiency,0.0490258329591602
 NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,drop_out_rate,0.320805646128878
+NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,total_families,23825702
+NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,family_mean,6.748161712309
+NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,family_median,5
+NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,family_max,50
+NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,families_gt1,16771629
+NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,single_families,6731955
+NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,paired_families,9994045
+NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,paired_and_gt1,8152302
+
+```
+
+
+#### Sanity check the CLI
+```bash
+Rscript main.R --help
+
 ```

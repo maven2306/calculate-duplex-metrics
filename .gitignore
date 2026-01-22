@@ -15,4 +15,8 @@ renv/staging/
 
 .DS_Store
 *.swp
-.Rproj.user
+*.Rproj
+.Rproj.user/
+
+test_output/
+ref/
