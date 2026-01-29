@@ -15,5 +15,8 @@ renv/staging/
 
 .DS_Store
 *.swp
-.Rproj.user
-data/NanoMB1Rep1
+*.Rproj
+.Rproj.user/
+
+test_output/
+ref/
