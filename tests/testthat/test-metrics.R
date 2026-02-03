@@ -1,41 +1,61 @@
 library(testthat)
+library(data.table)
+library(Rsamtools)
+library(GenomicRanges)
+library(Biostrings)
 
 source("../../R/calculate_nanoseq_functions.R")
 
 # ------------------------------------------------------------------------------
-# Small rbs table
+# Load test file and reference for GC calculation
 # ------------------------------------------------------------------------------
 
-rbs_basic <- data.frame(
-  chrom = rep("2e914854fabb46b9_1", 9),
-  pos   = c(0, 0, 0, 0, 0, 0, 0, 0, 0),
-  mpos  = c(2, 2, 2, 2, 2, 3, 3, 3, 4),
-  umi   = c("ATC-GCC", "CAT-GCC", "GAT-GAT",
-    "GTT-CCC", "TTT-GGA", "AAT-CCG",
-    "GTT-ACC", "NTT-NCC", "TGC-GTT"),
-  x = c(1, 1, 7, 7, 4, 1, 3, 1, 1),
-  y = c(3, 0, 2, 5, 9, 0, 0, 0, 0),
-  stringsAsFactors = FALSE )
+args <- commandArgs(trailingOnly = TRUE)
 
-rbs_empty <- rbs_basic[0,]
+get_arg <- function(flag, default = NULL) {
+  idx <- match(flag, args)
+  if (!is.na(idx) && length(args) >= idx + 1) {
+    return(args[idx + 1])
+  }
+  default
+}
 
+test_file <- get_arg("--test_file")
+ref_file   <- get_arg("--ref")
+
+if (is.null(test_file)) {
+  stop("Missing required argument: --test_file <rinfo file>")
+}
+
+rinfo <- fread(test_file)
+
+if (!is.null(ref_file)) {
+  genomeFile <- FaFile(ref_file)
+  genome_max <- seqlengths(genomeFile)
+} else {
+  genomeFile <- NULL
+  genome_max <- NULL
+}
+
+
+rinfo_empty <- rinfo[0,]
 rlen  <- 100
 skips <- 0
-genomeFile <- "../../ref/Escherichia_coli_ATCC_10798.fasta"
-genome_max <- c(chr1 = 1000000)
+rinfo[, chrom := "NARG01000001.1"]
+
 # ------------------------------------------------------------------------------
 # calculate_singletons
 # ------------------------------------------------------------------------------
 
 test_that("calculate_singletons returns fraction in [0,1]", {
-  val <- calculate_singletons(rbs_basic)
+  val <- calculate_singletons(rinfo)
   expect_type(val, "double")
   expect_true(val >= 0 && val <= 1)
-  expect_equal(val,0.0888888888888889, tolerance = 1e-3)
+  expect_equal(val, 0.0216, tolerance = 1e-3)
 })
 
 test_that("calculate_singletons returns NA with empty input", {
-  val <- calculate_singletons(rbs_empty)
+  val <- calculate_singletons(rinfo_empty)
   expect_true(is.na(val))
 })
 
@@ -44,19 +64,19 @@ test_that("calculate_singletons returns NA with empty input", {
 # ------------------------------------------------------------------------------
 
 test_that("calculate_family_stats returns named vector with expected names", {
-  stats <- calculate_family_stats(rbs_basic)
+  stats <- calculate_family_stats(rinfo)
   expect_type(stats, "double")
   expect_named(stats, c("total_families","family_mean","family_median","family_max",
       "families_gt1","single_families","paired_families","paired_and_gt1"))
 })
 
 test_that("calculate_family_stats returns correct known values", {
-  stats <- calculate_family_stats(rbs_basic)
-  expect_equal(stats[["total_families"]], 9)
-  expect_equal(stats[["family_mean"]], 5)
-  expect_equal(stats[["family_max"]], 13)
-  expect_equal(stats[["single_families"]], 4)
-  expect_equal(stats[["paired_families"]], 4)
+  stats <- calculate_family_stats(rinfo)
+  expect_equal(stats[["total_families"]], 9999)
+  expect_equal(stats[["family_mean"]], 9, , tolerance = 1e-3)
+  expect_equal(stats[["family_max"]], 42)
+  expect_equal(stats[["single_families"]], 1943)
+  expect_equal(stats[["paired_families"]], 6008)
 })
 
 # ------------------------------------------------------------------------------
@@ -64,20 +84,20 @@ test_that("calculate_family_stats returns correct known values", {
 # ------------------------------------------------------------------------------
 
 test_that("calculate_efficiency returns valid output", {
-  eff <- calculate_efficiency(rbs_basic, rlen = rlen, skips = skips)
+  eff <- calculate_efficiency(rinfo, rlen = rlen, skips = skips)
   expect_type(eff, "double")
   expect_true(is.finite(eff))
   expect_true(eff >= 0 && eff <= 1)
-  expect_equal(eff, 0.0667, tolerance = 1e-3)
+  expect_equal(eff, 0.0567, tolerance = 1e-3)
 })
 
 test_that("calculate_efficiency errors on invalid rlen/skips", {
-  expect_error(calculate_efficiency(rbs_basic, rlen = -1, skips = 0))
-  expect_error(calculate_efficiency(rbs_basic, rlen = 10, skips = 10))
+  expect_error(calculate_efficiency(rinfo, rlen = -1, skips = 0))
+  expect_error(calculate_efficiency(rinfo, rlen = 10, skips = 10))
 })
 
 test_that("calculate_efficiency returns NA for zero reads", {
-  eff <- calculate_efficiency(rbs_empty, rlen = rlen, skips = skips)
+  eff <- calculate_efficiency(rinfo_empty, rlen = rlen, skips = skips)
   expect_true(is.na(eff))
 })
 # ------------------------------------------------------------------------------
@@ -85,13 +105,13 @@ test_that("calculate_efficiency returns NA for zero reads", {
 # ------------------------------------------------------------------------------
 
 test_that("calculate_missed_fraction returns numeric or NA", {
-  val <- calculate_missed_fraction(rbs_basic)
+  val <- calculate_missed_fraction(rinfo)
   expect_type(val, "double")
-  expect_equal(val,-0.033203125)
+  expect_equal(val,0.192, tolerance = 1e-3)
 })
 
 test_that("calculate_missed_fraction returns NA with empty input", {
-  val <- calculate_missed_fraction(rbs_empty)
+  val <- calculate_missed_fraction(rinfo_empty)
   expect_true(is.na(val))
 })
 
@@ -101,7 +121,7 @@ test_that("calculate_missed_fraction returns NA with empty input", {
 
 test_that("calculate_gc returns NA metrics if reference genome missing", {
   gc <- calculate_gc(
-    rbs_basic,
+    rinfo,
     rlen = rlen,
     skips = skips,
     genomeFile = NULL,
@@ -113,9 +133,11 @@ test_that("calculate_gc returns NA metrics if reference genome missing", {
 
 
 test_that("calculate_gc returns expected GC metrics when reference is provided", {
-  gc <- calculate_gc(rbs_basic,rlen = rlen, skips = skips, genomeFile = genomeFile, genome_max = genome_max)
+  gc <- calculate_gc(rinfo,rlen = rlen, skips = skips, genomeFile = genomeFile, genome_max = genome_max)
   expect_named(gc, c("gc_single", "gc_both", "gc_deviation"))
-  expect_true(all(is.na(gc) | (gc >= 0 & gc <= 1)))
+  expect_equal(gc[["gc_single"]], 0.397, tolerance = 1e-3)
+  expect_equal(gc[["gc_both"]], 0.398, tolerance = 1e-3)
+  expect_equal(gc[["gc_deviation"]], 0.001, tolerance = 1e-3)
 })
 
 # ------------------------------------------------------------------------------
@@ -141,7 +163,7 @@ test_that("resolve_metric_selection errors on unknown metric", {
 
 test_that("calculate_metrics_selected returns 1-row data.frame", {
   res <- calculate_metrics_selected(
-    rbs_basic,
+    rinfo,
     groups = "family",
     individual = "frac_singletons",
     rlen = rlen,
@@ -155,11 +177,13 @@ test_that("calculate_metrics_selected returns 1-row data.frame", {
 test_that("calculate_metrics_selected errors if GC selected without refernce genome", {
   expect_error(
     calculate_metrics_selected(
-      rbs_basic,
+      rinfo,
       groups = "gc",
       individual = character(0),
       rlen = rlen,
-      skips = skips
+      skips = skips,
+      genomeFile = NULL,
+      genome_max = NULL
     ),
     "GC metrics requested"
   )
