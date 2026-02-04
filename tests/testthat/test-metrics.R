@@ -7,36 +7,10 @@ library(Biostrings)
 source("../../R/calculate_nanoseq_functions.R")
 
 # ------------------------------------------------------------------------------
-# Load test file and reference for GC calculation
+# Load test file
 # ------------------------------------------------------------------------------
 
-args <- commandArgs(trailingOnly = TRUE)
-
-get_arg <- function(flag, default = NULL) {
-  idx <- match(flag, args)
-  if (!is.na(idx) && length(args) >= idx + 1) {
-    return(args[idx + 1])
-  }
-  default
-}
-
-test_file <- get_arg("--test_file")
-ref_file   <- get_arg("--ref")
-
-if (is.null(test_file)) {
-  stop("Missing required argument: --test_file <rinfo file>")
-}
-
-rinfo <- fread(test_file)
-
-if (!is.null(ref_file)) {
-  genomeFile <- FaFile(ref_file)
-  genome_max <- seqlengths(genomeFile)
-} else {
-  genomeFile <- NULL
-  genome_max <- NULL
-}
-
+rinfo <- fread("../../data/NanoMB1Rep1_test_10k.txt")
 
 rinfo_empty <- rinfo[0,]
 rlen  <- 100
@@ -132,8 +106,17 @@ test_that("calculate_gc returns NA metrics if reference genome missing", {
 })
 
 
-test_that("calculate_gc returns expected GC metrics when reference is provided", {
-  gc <- calculate_gc(rinfo,rlen = rlen, skips = skips, genomeFile = genomeFile, genome_max = genome_max)
+test_that("calculate_gc returns expected GC metrics when reference is provided", {  
+ ref <- withr::local_tempfile(fileext = ".gz")
+  download.file(
+    "https://sra-download.ncbi.nlm.nih.gov/traces/wgs03/wgs_aux/NA/RG/NARG01/NARG01.1.fsa_nt.gz",
+    destfile = ref, mode = "wb")
+ fa <- R.utils::gunzip(ref, remove = FALSE)
+ indexFa(fa)
+ genomeFile <- FaFile(fa)
+ genome_max <- seqlengths(genomeFile)
+
+ gc <- calculate_gc(rinfo,rlen = rlen, skips = skips, genomeFile = genomeFile, genome_max = genome_max)
   expect_named(gc, c("gc_single", "gc_both", "gc_deviation"))
   expect_equal(gc[["gc_single"]], 0.397, tolerance = 1e-3)
   expect_equal(gc[["gc_both"]], 0.398, tolerance = 1e-3)
