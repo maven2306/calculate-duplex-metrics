@@ -193,3 +193,16 @@ NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001,paired_and_gt1,8152302
 Rscript main.R --help
 
 ```
+
+## Testing 
+Test that functions return valid numeric values, correct handling of edge cases (NA, zero reads, invalid inputs) and presence of expected metrics names.
+
+#### Requirements
+Packages: testthat
+
+#### To run all tests
+From the project root run:
+```bash
+Rscript tests/testthat.R
+
+```
