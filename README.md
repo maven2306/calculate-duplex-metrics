@@ -44,36 +44,92 @@ Only the requested individual metrics and/or metric groups are evaluated.
 - If GC metrics are explicitly requested (e.g. `--metrics gc`) but no reference FASTA is supplied, the program exits with an error.
 
 
-## Installation
+## Installation and Usage
 
-### Requirement
-- R version **4.4.1**
+### Option A: Using Docker (Recommended)
 
-### Using `renv` 
+This method packages the script and all its dependencies into a self-contained environment. It is the most reliable way to run the analysis, as it guarantees that the exact same software versions are used every time.
 
-This project uses `renv` to ensure reproducible dependency management.
+#### Requirements
+- **Docker:** You must have Docker installed and the Docker daemon running. You can download it from the [Docker website](https://www.docker.com/products/docker-desktop/).
 
-From the project root directory:
+#### Installation Steps
 
-```r
-install.packages("renv", repos = "https://cloud.r-project.org")
-renv::restore()
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/WEHIGenomicsRnD/calculate-duplex-metrics.git
+    ```
 
-```
+2.  **Navigate to the project directory:**
+    ```bash
+    cd calculate-duplex-metrics
+    ```
 
+3.  **Build the Docker image:** This command reads the `Dockerfile` and builds a container image named `calculate-duplex-metrics`. This may take several minutes the first time you run it.
+    ```bash
+    docker build -t calculate-duplex-metrics .
+    ```
 
-## Usage
+4.  **(Optional) Verify the image:** You can check that the image was built successfully by listing your local Docker images.
+    ```bash
+    docker images
+    ```
+    You should see `calculate-duplex-metrics` in the list.
 
+#### Default Usage Example
 
-#### Example: default, no GC computation
+To run the tool, you use the `docker run` command. The `-v` flags are essential for allowing the Docker container to access files on your local machine.
 
-``` bash
-Rscript main.R \
-  --input data/NanoMB1Rep1_HJK2GDSX3_CGGCTAAT-CTCGTTCT_L001.txt \
+```bash
+docker run --rm \
+  -v "$(pwd)/data:/app/data" \
+  -v "$(pwd)/out:/app/out" \
+  calculate-duplex-metrics \
+  --input data/test.rinfo \
   --output out/default.csv
-
 ```
 
+-   `-v "$(pwd)/data:/app/data"`: This "mounts" your local `data` directory into the `/app/data` directory inside the container, so the script can find the input file.
+-   `-v "$(pwd)/out:/app/out"`: This mounts your local `out` directory into the `/app/out` directory inside the container, so the script can write the output file back to your machine.
+
+### Option B: Local Installation (via `devtools`)
+
+This method installs the required R packages directly onto your system. It is more flexible but less reproducible than Docker, as it will use your system's installed version of R and the latest available package versions.
+
+#### Requirements
+- **R:** R version 4.4.1 is recommended.
+- **`devtools` R package:** This is used to install packages from GitHub.
+
+#### Installation Steps
+
+1.  **Install `devtools`:** If you don't have it already, open an R console and run:
+    ```r
+    install.packages("devtools")
+    ```
+
+2.  **Install Bioconductor dependencies:** This tool requires several packages from the Bioconductor repository.
+    ```r
+    if (!require("BiocManager", quietly = TRUE))
+        install.packages("BiocManager")
+    BiocManager::install(c("Rsamtools", "GenomicRanges", "IRanges", "Biostrings"))
+    ```
+
+3.  **Install the package from GitHub:**
+    ```r
+    devtools::install_github('WEHIGenomicsRnD/calculate-duplex-metrics')
+    ```
+
+#### Default Usage Example
+
+After installing the dependencies, you can run the script directly from your terminal within the cloned repository directory.
+
+```bash
+Rscript main.R \
+  --input data/test.rinfo \
+  --output out/default.csv
+```
+
+## Additional Usage Examples
 #### Example: default mode with GC enabled (requires reference genome)
 
 Note: The reference genome FASTA is user-provided and not included
