@@ -92,23 +92,53 @@ docker run --rm \
 -   `-v "$(pwd)/data:/app/data"`: This "mounts" your local `data` directory into the `/app/data` directory inside the container, so the script can find the input file.
 -   `-v "$(pwd)/out:/app/out"`: This mounts your local `out` directory into the `/app/out` directory inside the container, so the script can write the output file back to your machine.
 
-### Option B: Local Installation (via `devtools`)
+### Option B: Local Installation with `renv`
 
-This method installs the required R packages directly onto your system. It is more flexible but less reproducible than Docker, as it will use your system's installed version of R and the latest available package versions.
+This method uses the `renv` package to recreate the exact development environment, using the specific package versions defined in the `renv.lock` file.
 
 #### Requirements
-- **R:** R version 4.4.1 is recommended.
+- **R:** R version **4.4.1** 
+
+#### Installation Steps
+
+1.  **Clone the repository and navigate into it.**
+
+2.  **Open an R console** in the project's root directory.
+
+3.  **Restore the environment:** This command will install `renv` if needed, then install all the packages listed in `renv.lock` with their exact versions.
+    ```r
+    if (!require("renv")) install.packages("renv", repos = "https://cloud.r-project.org")
+    renv::restore()
+    ```
+
+#### Default Usage Example
+
+After restoring the environment, you can run the script directly from your terminal within the cloned repository directory.
+
+```bash
+Rscript main.R \
+  --input data/test.rinfo \
+  --output out/default.csv
+```
+
+### Option C: Local Installation with `devtools`
+
+This method installs the required R packages directly onto your system. It is more flexible if you have a different version of R, but it is less reproducible as it will use the latest available package versions.
+
+#### Requirements
+- **R:** Any modern version of R.
 - **`devtools` R package:** This is used to install packages from GitHub.
 
 #### Installation Steps
 
-1.  **Install `devtools`:** If you don't have it already, open an R console and run:
-    ```r
-    install.packages("devtools")
-    ```
+1.  **Open an R console.**
 
-2.  **Install Bioconductor dependencies:** This tool requires several packages from the Bioconductor repository.
+2.  **Install `devtools` and Bioconductor dependencies:**
     ```r
+    # Install devtools from CRAN
+    install.packages("devtools")
+
+    # Install BiocManager and required Bioconductor packages
     if (!require("BiocManager", quietly = TRUE))
         install.packages("BiocManager")
     BiocManager::install(c("Rsamtools", "GenomicRanges", "IRanges", "Biostrings"))
@@ -128,6 +158,7 @@ Rscript main.R \
   --input data/test.rinfo \
   --output out/default.csv
 ```
+
 
 ## Additional Usage Examples
 #### Example: default mode with GC enabled (requires reference genome)
