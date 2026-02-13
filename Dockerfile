@@ -35,5 +35,5 @@ RUN R -q -e "options(repos=c(CRAN='https://cloud.r-project.org')); install.packa
 # Copy the rest
 COPY . .
 
-# Set entrypoint
-ENTRYPOINT ["Rscript", "main.R"]
+# Set default command to bash for flexibility
+CMD ["/bin/bash"]
