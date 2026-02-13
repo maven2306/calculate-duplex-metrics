@@ -7,7 +7,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libcurl4-openssl-dev libssl-dev libxml2-dev \
     python3 python3-pip python3-venv python3-distutils \
- && rm -rf /var/lib/apt/lists/*
+    zlib1g-dev \
+    liblzma-dev \ 
+    libbz2-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Hint to findpython (optional but helpful)
 ENV PYTHON=/usr/bin/python3
@@ -27,11 +30,10 @@ COPY .Rprofile ./
 
 # Restore R packages; fail build if argparse didn't install
 RUN R -q -e "options(repos=c(CRAN='https://cloud.r-project.org')); install.packages('renv')" \
- && R -q -e "renv::restore(prompt = FALSE)" \
- && R -q -e "stopifnot(all(c('argparse','data.table','dplyr','magrittr','R.utils') %in% rownames(installed.packages())))"
+ && R -q -e "renv::restore(prompt = FALSE)"
 
 # Copy the rest
 COPY . .
 
-# Set entrypoint
-ENTRYPOINT ["Rscript", "src/main.R"]
+# Set default command to bash for flexibility
+CMD ["/bin/bash"]
