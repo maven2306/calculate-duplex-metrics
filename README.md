@@ -85,6 +85,7 @@ docker run --rm \
   -v "$(pwd)/data:/app/data" \
   -v "$(pwd)/out:/app/out" \
   calculate-duplex-metrics \
+  Rscript main.R \
   --input data/test.rinfo \
   --output out/default.csv
 ```
