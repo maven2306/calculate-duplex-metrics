@@ -160,8 +160,46 @@ Rscript main.R \
   --output out/default.csv
 ```
 
+### Option D: Using Conda
+
+This method uses Conda to manage the R environment and dependencies.
+
+#### Requirements
+- **Conda or Miniconda:** You must have Conda installed. You can download it from the [Conda website](https://docs.conda.io/en/latest/miniconda.html).
+
+#### Installation Steps
+
+1.  **Clone the repository and navigate into it.**
+
+2.  **Create the conda environment:** This command reads the `env/environment.yaml` file and creates a new conda environment with all required packages.
+    ```bash
+    conda env create -f env/environment.yaml
+    ```
+
+3.  **Activate the environment:**
+    ```bash
+    conda activate calculate-duplex-metrics
+    ```
+
+#### Default Usage Example
+
+```bash
+Rscript --no-init-file main.R \
+  --input data/test.rinfo \
+  --output out/default.csv
+```
+
+**Important:** Always use `--no-init-file` when running with conda to skip the `.Rprofile` file that activates renv.
+
+To deactivate the conda environment when finished:
+```bash
+conda deactivate
+```
+
 
 ## Additional Usage Examples
+
+
 #### Example: default mode with GC enabled (requires reference genome)
 
 Note: The reference genome FASTA is user-provided and not included
